@@ -1,12 +1,12 @@
 var mongodb = require('./db'),
     markdown = require('markdown').markdown;
 
-function Post(name, title, post) {
+function Post(name, title, tags, post) {
   this.name = name;
   this.title = title;
+  this.tags = tags;
   this.post = post;
-}
-
+};
 module.exports = Post;
 
 //存储一篇文章及其相关信息
@@ -26,8 +26,9 @@ Post.prototype.save = function(callback) {
       name: this.name,
       time: time,
       title: this.title,
+      tags: this.tags,
       post: this.post,
-      comments:[]
+      comments: []
   };
   //打开数据库
   mongodb.open(function (err, db) {
@@ -54,15 +55,15 @@ Post.prototype.save = function(callback) {
   });
 };
 
-//读取文章及其相关信息
-Post.getAll = function(name, callback) {
+//一次获取十篇文章
+Post.getTen = function(name, page, callback) {
   //打开数据库
   mongodb.open(function (err, db) {
     if (err) {
       return callback(err);
     }
     //读取 posts 集合
-    db.collection('posts', function(err, collection) {
+    db.collection('posts', function (err, collection) {
       if (err) {
         mongodb.close();
         return callback(err);
@@ -71,19 +72,25 @@ Post.getAll = function(name, callback) {
       if (name) {
         query.name = name;
       }
-      //根据 query 对象查询文章
-      collection.find(query).sort({
-        time: -1
-      }).toArray(function (err, docs) {
-        mongodb.close();
-        if (err) {
-          return callback(err);//失败！返回 err
-        }
-	//解析markdown为html
-	docs.forEach(function(doc) {
-	    doc.post = markdown.toHTML(doc.post);
-	});
-        callback(null, docs);//成功！以数组形式返回查询的结果
+      //使用 count 返回特定查询的文档数 total
+      collection.count(query, function (err, total) {
+        //根据 query 对象查询，并跳过前 (page-1)*10 个结果，返回之后的 10 个结果
+        collection.find(query, {
+          skip: (page - 1)*10,
+          limit: 10
+        }).sort({
+          time: -1
+        }).toArray(function (err, docs) {
+          mongodb.close();
+          if (err) {
+            return callback(err);
+          }
+          //解析 markdown 为 html
+          docs.forEach(function (doc) {
+            doc.post = markdown.toHTML(doc.post);
+          });
+          callback(null, docs, total);
+        });
       });
     });
   });
@@ -206,6 +213,93 @@ Post.remove = function(name, day, title, callback) {
           return callback(err);
         }
         callback(null);
+      });
+    });
+  });
+};
+
+
+//返回所有文章存档信息
+Post.getArchive = function(callback) {
+  //打开数据库
+  mongodb.open(function (err, db) {
+    if (err) {
+      return callback(err);
+    }
+    //读取 posts 集合
+    db.collection('posts', function (err, collection) {
+      if (err) {
+        mongodb.close();
+        return callback(err);
+      }
+      //返回只包含 name、time、title 属性的文档组成的存档数组
+      collection.find({}, {
+        "name": 1,
+        "time": 1,
+        "title": 1
+      }).sort({
+        time: -1
+      }).toArray(function (err, docs) {
+        mongodb.close();
+        if (err) {
+          return callback(err);
+        }
+        callback(null, docs);
+      });
+    });
+  });
+};
+
+//返回含有特定标签的所有文章
+Post.getTags = function(callback) {
+  mongodb.open(function (err, db) {
+    if (err) {
+      return callback(err);
+    }
+    db.collection('posts', function (err, collection) {
+      if (err) {
+        mongodb.close();
+        return callback(err);
+      }
+      //distinct 用来找出给定键的所有不同值
+      collection.distinct("tags", function (err, docs) {
+        mongodb.close();
+        if (err) {
+          return callback(err);
+        }
+        callback(null, docs);
+      });
+    });
+  });
+};
+
+//返回特定标签页
+Post.getTag = function(tag, callback) {
+  mongodb.open(function (err, db) {
+    if (err) {
+      return callback(err);
+    }
+    db.collection('posts', function (err, collection) {
+      if (err) {
+        mongodb.close();
+        return callback(err);
+      }
+      //查询所有 tags 数组内包含 tag 的文档
+      //并返回只含有 name、time、title 组成的数组
+      collection.find({
+        "tags": tag
+      }, {
+        "name": 1,
+        "time": 1,
+        "title": 1
+      }).sort({
+        time: -1
+      }).toArray(function (err, docs) {
+        mongodb.close();
+        if (err) {
+          return callback(err);
+        }
+        callback(null, docs);
       });
     });
   });

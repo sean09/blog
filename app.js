@@ -16,7 +16,8 @@ var flash = require('connect-flash');
 
 var app = express();
 
-
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: false }));
 
 //express-session中间件
 app.use(session({
@@ -27,7 +28,7 @@ app.use(session({
         db: settings.db,
         host: settings.host,
         port: settings.port,
-	url:'mongodb://localhost/' + settings.db
+	      url:'mongodb://localhost/' + settings.db
     })
 }));
 
@@ -47,7 +48,6 @@ var cpUpload = upload.any();
 app.use(cpUpload);
 
 routes(app);
-
 
 // view engine setup
 app.set('views', path.join(__dirname, 'views'));

@@ -193,6 +193,7 @@ module.exports = function (app) {
       });
     });
 
+
   app.get('/archive', function (req, res) {
     Post.getArchive(function (err, posts) {
       if (err) {
